@@ -1,66 +1,88 @@
 import os
+from datetime import datetime
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import firebase_admin
-from firebase_admin import credentials, auth
+from firebase_admin import credentials, auth, firestore
+from pydantic import BaseModel
 
-# 1. Khởi tạo FastAPI App
 app = FastAPI(title="Note App API", version="1.0.0")
 
-# 2. Cấu hình CORS Middleware
-# Cho phép Frontend gọi API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Trong thực tế nên sửa thành domain cụ thể của frontend
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# 3. Khởi tạo Firebase Admin SDK
+# --- KHỞI TẠO FIREBASE & FIRESTORE ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
 key_path = os.path.join(current_dir, "firebase-service-account.json")
-cred = credentials.Certificate(key_path)
-firebase_admin.initialize_app(cred)
 
-# 4. Endpoints Cơ bản
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to Note App API"}
+# Kiểm tra xem app đã khởi tạo chưa để tránh lỗi chạy lại của Uvicorn
+if not firebase_admin._apps:
+    cred = credentials.Certificate(key_path)
+    firebase_admin.initialize_app(cred)
 
-@app.get("/health")
-def health_check():
-    return {"status": "ok", "service": "running"}
+# Khởi tạo client kết nối với Firestore DB
+db = firestore.client()
 
-# 5. Endpoint Xác thực (Xác minh Firebase Token)
+# --- DEPENDENCY XÁC THỰC ---
 security = HTTPBearer()
 
 def verify_firebase_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """
-    Hàm này đóng vai trò như một Dependency. 
-    Nó trích xuất Token JWT từ header Authorization: Bearer <token>,
-    sau đó dùng Firebase Admin SDK để verify token đó.
-    """
     token = credentials.credentials
     try:
-        # Giải mã và xác thực token với Firebase
         decoded_token = auth.verify_id_token(token)
-        return decoded_token # Trả về payload chứa thông tin user (uid, email...)
+        return decoded_token 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail="Token không hợp lệ hoặc đã hết hạn",
         )
 
-@app.get("/auth/me")
-def get_current_user(user_data: dict = Depends(verify_firebase_token)):
-    """
-    Endpoint test xác thực. Chỉ trả về thông tin khi token hợp lệ.
-    """
-    return {
-        "message": "Authentication successful",
-        "uid": user_data.get("uid"),
-        "email": user_data.get("email")
+# --- SCHEMA CHO DỮ LIỆU ĐẦU VÀO ---
+class NoteRequest(BaseModel):
+    content: str
+
+# --- ENDPOINTS GHI CHÚ ---
+
+# 1. API Lưu ghi chú mới (POST)
+@app.post("/notes")
+def create_note(note: NoteRequest, user_data: dict = Depends(verify_firebase_token)):
+    # Lấy UID của user đang gọi API để lưu vào DB, đảm bảo ai xem ghi chú người nấy
+    uid = user_data.get("uid")
+
+    # Tạo document mới trong collection 'notes'
+    note_data = {
+        "uid": uid,
+        "content": note.content,
+        "created_at": datetime.now()
     }
+
+    # Thêm vào Firestore
+    doc_ref = db.collection('notes').document()
+    doc_ref.set(note_data)
+
+    return {"message": "Đã lưu ghi chú thành công", "note_id": doc_ref.id}
+
+# 2. API Lấy danh sách ghi chú (GET)
+@app.get("/notes")
+def get_notes(user_data: dict = Depends(verify_firebase_token)):
+    uid = user_data.get("uid")
+
+    # Truy vấn DB: Chỉ lấy những ghi chú có uid bằng với uid của người đang đăng nhập
+    notes_ref = db.collection('notes').where('uid', '==', uid).order_by('created_at', direction=firestore.Query.DESCENDING).stream()
+
+    notes_list = []
+    for note in notes_ref:
+        doc_data = note.to_dict()
+        notes_list.append({
+            "id": note.id,
+            "content": doc_data.get("content"),
+            "created_at": doc_data.get("created_at")
+        })
+
+    return {"notes": notes_list}
