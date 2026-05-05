@@ -80,4 +80,4 @@ python -m streamlit run frontend/app.py
 
 ## 6. Video Demo Sản phẩm
 
-👉 **[LINK VIDEO DEMO YOUTUBE HOẶC GOOGLE DRIVE CỦA BẠN ĐIỀN VÀO ĐÂY]**
+👉 **[[[LINK VIDEO DEMO YOUTUBE](https://youtu.be/OvFXHwDP0vI)]]**
