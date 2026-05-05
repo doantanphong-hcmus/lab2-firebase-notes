@@ -80,4 +80,4 @@ python -m streamlit run frontend/app.py
 
 ## 6. Video Demo Sản phẩm
 
-👉 **[[LINK VIDEO DEMO YOUTUBE HOẶC GOOGLE DRIVE CỦA BẠN ĐIỀN VÀO ĐÂY](https://github.com/doantanphong-hcmus/lab2-firebase-notes.git)]**
+👉 **[[LINK VIDEO DEMO YOUTUBE](https://github.com/doantanphong-hcmus/lab2-firebase-notes.git)]**
