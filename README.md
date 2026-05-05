@@ -58,8 +58,13 @@ pip install -r requirements.txt
 ```
 
 **Bước 4: Cấu hình khóa bảo mật Firebase**
-1. Tải file Private Key từ Firebase Console (Project Settings -> Service Accounts), đổi tên thành `firebase-service-account.json` và lưu vào thư mục `backend/`.
-2. Lấy chuỗi Web API Key từ Firebase Console (Project Settings -> General), mở file `frontend/app.py` và cập nhật vào biến `FIREBASE_WEB_API_KEY`.
+Vì lý do tuân thủ nguyên tắc bảo mật mã nguồn mở, các file chứa thông tin nhạy cảm (`.env` chứa Web API Key và `firebase-service-account.json` chứa Private Key) đã được cấu hình `.gitignore` và không có trên Repository này.
+
+Để chạy thử nghiệm dự án, vui lòng thực hiện:
+1. Tạo một Project Firebase mới, bật dịch vụ **Authentication (Email/Password)** và khởi tạo **Firestore Database**.
+2. Lấy file Private Key (.json) đặt vào thư mục `backend/` và đổi tên thành `firebase-service-account.json`.
+3. Tạo file `.env` tại thư mục gốc và dán Web API Key vào biến: `FIREBASE_WEB_API_KEY="key_của_giảng_viên"`
+4. **Lưu ý quan trọng về Composite Index:** Khi chạy ứng dụng lần đầu với Database mới, Firestore có thể yêu cầu tạo Composite Index cho truy vấn sắp xếp ghi chú. Nếu gặp lỗi ở màn hình danh sách, vui lòng kiểm tra Terminal của FastAPI, click vào đường link Firebase sinh ra tự động để tiến hành Build Index (mất khoảng 2-3 phút) là hệ thống sẽ hoạt động bình thường.
 
 ## 5. Hướng dẫn khởi chạy hệ thống
 
