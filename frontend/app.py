@@ -1,9 +1,15 @@
 import streamlit as st
 import requests
+import os
+from dotenv import load_dotenv
+
+# Load các biến môi trường từ file .env lên hệ thống
+load_dotenv()
 
 # Cấu hình hằng số 
 BACKEND_URL = "http://127.0.0.1:8000"
-FIREBASE_WEB_API_KEY = "AIzaSyAvMuGyFfZMA1zH_c_f1xHOWLOrD9n1GmE" 
+# Lấy Key từ file .env, nếu không có thì trả về chuỗi rỗng
+FIREBASE_WEB_API_KEY = os.getenv("FIREBASE_WEB_API_KEY", "") 
 
 st.set_page_config(page_title="Note App - Lab 2", page_icon="📝")
 
@@ -17,7 +23,6 @@ def login_with_firebase(email, password):
     }
     response = requests.post(url, json=payload)
     if response.status_code == 200:
-        # Lấy được ID Token (rất quan trọng để gửi kèm Header xuống Backend)
         return response.json().get("idToken")
     else:
         st.error(f"Đăng nhập thất bại: {response.json().get('error', {}).get('message')}")
@@ -74,7 +79,7 @@ if not st.session_state.token:
                     success, msg = register_with_firebase(email_reg, password_reg)
                     if success:
                         st.success(msg)
-                        st.balloons() # Thêm tí hiệu ứng bóng bay cho sinh động lúc demo
+                        st.balloons() 
                     else:
                         st.error(msg)
 
@@ -92,35 +97,39 @@ else:
 
     # Form Thêm ghi chú mới
     st.subheader("Thêm ghi chú")
-    # Dùng form với clear_on_submit để tự động xóa chữ sau khi bấm Lưu
+    
     with st.form("add_note_form", clear_on_submit=True):
         note_content = st.text_area("Hôm nay có gì mới?")
         submit_note = st.form_submit_button("Lưu ghi chú")
         
         if submit_note:
             if note_content.strip():
-                res = requests.post(f"{BACKEND_URL}/notes", json={"content": note_content}, headers=headers)
-                if res.status_code == 200:
-                    st.success("Đã lưu!")
-                    st.rerun() # Bắt buộc rerun để danh sách bên dưới cập nhật ngay lập tức
-                else:
-                    st.error("Lỗi khi lưu ghi chú.")
+                try:
+                    res = requests.post(f"{BACKEND_URL}/notes", json={"content": note_content}, headers=headers)
+                    if res.status_code == 200:
+                        st.success("Đã lưu!")
+                        st.rerun() 
+                    else:
+                        st.error("Lỗi khi lưu ghi chú.")
+                except requests.exceptions.ConnectionError:
+                    st.error("🚨 Không thể kết nối tới Backend. Xin hãy kiểm tra lại lệnh chạy Uvicorn!")
             else:
                 st.warning("Vui lòng nhập nội dung.")
+                
     # Hiển thị danh sách ghi chú
     st.subheader("Danh sách của tôi")
-    # Bắn request GET xuống Backend FastAPI để lấy data
-    res = requests.get(f"{BACKEND_URL}/notes", headers=headers)
-    
-    if res.status_code == 200:
-        notes = res.json().get("notes", [])
-        if not notes:
-            st.info("Chưa có ghi chú nào.")
-        for note in notes:
-            with st.container(border=True):
-                # Thêm ngày tháng năm cho xịn (cắt chuỗi cho gọn nếu cần)
-                time_str = note.get('created_at', '')[:16] 
-                st.caption(f"🕒 {time_str}")
-                st.markdown(f"**Nội dung:** {note['content']}")
-    else:
-        st.error("Phiên đăng nhập hết hạn hoặc lỗi Server. Vui lòng đăng nhập lại.")
+    try:
+        res = requests.get(f"{BACKEND_URL}/notes", headers=headers)
+        if res.status_code == 200:
+            notes = res.json().get("notes", [])
+            if not notes:
+                st.info("Chưa có ghi chú nào.")
+            for note in notes:
+                with st.container(border=True):
+                    time_str = note.get('created_at', '')[:16] 
+                    st.caption(f"🕒 {time_str}")
+                    st.markdown(f"**Nội dung:** {note['content']}")
+        else:
+            st.error("Phiên đăng nhập hết hạn hoặc lỗi Server. Vui lòng đăng nhập lại.")
+    except requests.exceptions.ConnectionError:
+        st.error("🚨 Không thể lấy danh sách. Backend đang không phản hồi!")
